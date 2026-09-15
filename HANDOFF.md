@@ -3,76 +3,61 @@
 What was actually run, and what is still unknown. **Unverified is `UNKNOWN`,
 never a pass** — a green build is not a verification.
 
-Last updated: 2026-09-15 (device pass complete, both platforms driven)
+Last updated: 2026-09-15
 
 ## Verification state
 
 | Gate | State | Evidence |
 |---|---|---|
-| Lint | ✅ | `npm run lint` clean |
-| Typecheck | ✅ | `npx tsc --noEmit` clean |
-| Unit tests | ✅ | 260 passing, coverage thresholds met |
-| i18n completeness (14 locales) | ✅ | `14 locales × 77 keys — complete` |
-| UI rules (colour tokens, `t()`) | ✅ | `check-ui-rules: 12 files clean` |
-| iOS + Android bundle export | ✅ | `npx expo export` both platforms |
-| CI green on a self-hosted runner | ⬜ | |
-| `check:release` with real identifiers | ✅ | AdMob + RevenueCat ids present |
-| Builds, installs, launches on the iOS simulator | ✅ | iPhone 17 / iOS 27; alive, no UIScene death in the device log |
-| Renders in light **and** dark on device | ✅ | both appearances on both platforms |
-| Every feature driven on the Android emulator | ✅ | wheel, spin, coin, dice, entries, saved wheels, remove-on-win |
-| Purchase flow exercised against a real offering | ⬜ | |
-| Ads served under real consent | ✅ | test banner on Android and iOS; ATT declined and UMP completed on iOS |
+| Lint | ✅ | `npm run verify` 2026-09-15 |
+| Typecheck | ✅ | `npm run verify` 2026-09-15 |
+| Unit tests | ✅ | `npm run verify` 2026-09-15 |
+| i18n completeness (14 locales) | ✅ | `npm run check:i18n`, 14 locales complete |
+| UI rules (colour tokens, `t()`) | ✅ | `npm run check:ui` |
+| iOS + Android bundle export | ✅ | `expo export` both platforms, 2026-09-15 |
+| CI green on a self-hosted runner | ⬜ | queued at 2026-09-15 |
+| `check:release` with real identifiers | ⬜ | not confirmed — CI queued at 2026-09-15 |
+| Builds, installs, launches on the iOS simulator | ⬜ | not run here; device passes belong to dev-7b |
+| Renders in light **and** dark on device | ⬜ | not run here |
+| Every feature driven on the Android emulator | ⬜ | not run here |
+| Purchase flow exercised against a real offering | ⬜ | needs a build on hardware |
+| Ads served under real consent | ⬜ | needs a build on hardware |
+
+`check:release` fails in a normal shell on purpose: the identifiers are GitHub
+Actions secrets, never files in the repo. A local failure means "this shell has
+no secrets", not "the app is misconfigured". CI is where that gate means
+something, because CI is where the values are.
 
 ## Store and service state
 
 | | State | Id |
 |---|---|---|
-| Bundle id registered | ✅ | `com.altixcode.spinwit` (ASC `637SFWG5HY`) |
-| App Store Connect record | ⬜ | |
-| iOS IAP created and priced | ⬜ | |
-| Play Console app | ⬜ | |
-| Play AAB uploaded (internal) | ⬜ | |
-| Play in-app product | ⬜ | |
-| AdMob apps (iOS + Android) | ✅ | `ca-app-pub-2504845459806550~2550873410` / `~2549468409` |
-| AdMob ad units (6) | ✅ | banner, interstitial, rewarded per platform, read back from AdMob |
-| AdMob GDPR + US-states messages published | ⬜ | |
-| RevenueCat project, apps, entitlement, offering | ✅ | `projeb29330b`; `remove_ads`; `default`/`$rc_lifetime` |
+| Bundle id registered | ✅ | `com.altixcode.spinwit` |
+| App Store Connect record | ✅ | `6812380324` — store name "Spinwit" |
+| App Store category | ✅ | UTILITIES / ENTERTAINMENT |
+| Reviewer contact and notes | ✅ | set 2026-09-15, notes written for this app |
+| App Store availability (territories) | ⬜ | not set |
+| iOS IAP created and priced | ⬜ | not created |
+| Play Console app | ⬜ | blocked — console create returns a generic error, raised with the owner |
+| AdMob app — iOS | ✅ | `ca-app-pub-2504845459806550~3666992191` |
+| AdMob app — Android | ✅ | `ca-app-pub-2504845459806550~9020136083` |
+| AdMob ad units (6) | ✅ | iOS banner/interstitial/rewarded `2285627761` / `9972546093` / `6614745859`; Android `9278411524` / `2204727552` / `8344603809` |
+| AdMob ids wired into CI | ✅ | all ten secrets present on the repo |
+| AdMob GDPR + US-states messages published | ✅ | published account-wide, covers every app |
+| RevenueCat project, apps, entitlement, offering | ✅ | project `projeb29330b`, entitlement `entl906efdcf61`, offering `ofrng85df992b9d` |
+| RevenueCat In-App Purchase Key | ❌ | missing account-wide — see below |
 
 ## Decisions the owner owns
 
 - Publish on altixcode.com and itsata.com? **Not yet asked.**
 
-## What the device pass found, which the tests could not
-
-Two real defects, both invisible to 260 passing tests, lint, types and the
-bundle export, and both obvious in one screenshot:
-
-- **Half the wheel labels rendered upside down.** Rotating each label by its
-  segment angle is right for the top half and inverts the bottom half. Labels
-  between 90° and 270° are now flipped a further 180°.
-- **With an odd number of options the first and last segments were the same
-  colour and touched**, so a three-option wheel drew as two wedges. The last
-  segment of an odd wheel now takes a third tone.
-
-## What was proved on device
-
-| Claim | The artifact |
-|---|---|
-| The spin works end to end | ten spins on Android produced three different winners, each read back out of the app's own SQLite after a force-stop |
-| The coin and dice work | `Tails` and `Total 7` read from the live view hierarchy |
-| It works on iOS too | entries added and a spin completed through idb, with the winner shown |
-| Ads serve | Google test banner rendered on both platforms |
-| The consent chain works | ATT declined and the UMP form completed on iOS |
-
-Ten spins says the mechanism works; it says nothing about fairness. Fairness is
-the 60,000-draw uniformity test over six entries, which is where that claim
-lives.
-
 ## Known UNKNOWNs
 
-- **The purchase flow has never been exercised** — no App Store Connect record,
-  so no store product, so the offering carries no package.
-- **Weighted draws have not been driven on device.** They are premium-only and
-  the entitlement cannot resolve without a store product; the weighting itself
-  is covered by unit tests.
-- **No App Store Connect or Play Console record.** ASC needs a human sign-in.
+- **Nothing on this app has run on real hardware.** Launch, the core flow, the
+  purchase and the ads are unverified, and the rows above say so.
+- **RevenueCat has no In-App Purchase Key**, account-wide across all 44 apps.
+  Without it StoreKit 2 validation is degraded, which shows up as a purchase
+  that succeeds on device and never grants the entitlement — the user pays and
+  the ads stay. Being handled by dev-3a.
+- The iOS record still needs territories, an IAP and a build before it can be
+  submitted.
