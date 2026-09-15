@@ -9,7 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { G, Path, Circle as SvgCircle, Text as SvgText } from 'react-native-svg';
 
-import { useTheme } from '@/theme';
+import { useTheme, withAlpha } from '@/theme';
 
 interface Props {
   entries: readonly string[];
@@ -64,7 +64,16 @@ export function Wheel({ entries, angle, spinning, onSettled, size }: Props) {
   const r = size / 2;
   const count = Math.max(entries.length, 1);
   const segment = 360 / count;
-  const palette = [colors.accent, colors.surfaceAlt];
+  /**
+   * Two alternating tones, except that an ODD number of segments makes the first and last both
+   * even-indexed, so they meet as one continuous wedge. The last segment of an odd wheel gets a
+   * third tone instead. Visible the moment a three-option wheel is drawn, and invisible to
+   * every test.
+   */
+  const toneFor = (i: number): string => {
+    if (count % 2 === 1 && i === count - 1) return withAlpha(colors.accent, 0.55);
+    return i % 2 === 0 ? colors.accent : colors.surfaceAlt;
+  };
 
   return (
     <View style={[styles.wrap, { width: size, height: size }]}>
@@ -78,7 +87,7 @@ export function Wheel({ entries, angle, spinning, onSettled, size }: Props) {
               const rad = ((mid - 90) * Math.PI) / 180;
               const tx = r + r * 0.62 * Math.cos(rad);
               const ty = r + r * 0.62 * Math.sin(rad);
-              const fill = palette[i % palette.length]!;
+              const fill = toneFor(i);
               return (
                 <G key={`${entry}-${i}`}>
                   <Path d={wedge(r, r, r - 2, from, to)} fill={fill} stroke={colors.background} strokeWidth={2} />
@@ -90,7 +99,10 @@ export function Wheel({ entries, angle, spinning, onSettled, size }: Props) {
                     fontWeight="600"
                     textAnchor="middle"
                     alignmentBaseline="middle"
-                    transform={`rotate(${mid}, ${tx}, ${ty})`}
+                    // Labels in the lower half are flipped a further 180 degrees. Rotating every
+                    // label by its segment angle alone leaves the bottom ones upside down, which
+                    // the emulator showed immediately and no test would ever have caught.
+                    transform={`rotate(${mid > 90 && mid < 270 ? mid + 180 : mid}, ${tx}, ${ty})`}
                   >
                     {entry.length > 12 ? `${entry.slice(0, 11)}…` : entry}
                   </SvgText>
