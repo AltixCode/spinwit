@@ -16,6 +16,7 @@ import { showInterstitial } from '@/monetization/interstitial';
 import { FREE_WHEELS, useWheelStore, type Mode } from '@/store/useWheelStore';
 import { usePremiumStore } from '@/store/usePremiumStore';
 import { MIN_TOUCH_TARGET, useTheme, withAlpha } from '@/theme';
+import { useTabletColumn } from '@/theme/useTabletColumn';
 
 /** Whole turns before the wheel settles. Enough to read as a spin, not enough to be a wait. */
 const TURNS = 5;
@@ -25,6 +26,7 @@ export default function Home() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { colors, spacing, radius } = useTheme();
+  const tabletColumn = useTabletColumn();
 
   const mode = useWheelStore((s) => s.mode);
   const setMode = useWheelStore((s) => s.setMode);
@@ -167,6 +169,8 @@ export default function Home() {
           paddingHorizontal: spacing.base,
           paddingBottom: spacing.xl,
           gap: spacing.base,
+        
+          ...tabletColumn,
         }}
         showsVerticalScrollIndicator={false}
       >
