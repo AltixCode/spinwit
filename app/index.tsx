@@ -24,7 +24,7 @@ const TURNS = 5;
 export default function Home() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const { colors, spacing, radius } = useTheme();
   const tabletColumn = useTabletColumn();
 
@@ -157,7 +157,11 @@ export default function Home() {
     setDraft('');
   };
 
-  const wheelSize = Math.min(width - spacing.base * 2, 340);
+  // The wheel is the app. At a flat 340 it was a phone-sized dial adrift in a
+  // 13" display; the height term matters more here than elsewhere because the
+  // wheel shares the screen with the entries list below it.
+  const isTablet = width >= 700;
+  const wheelSize = Math.min(width - spacing.base * 2, height * 0.45, isTablet ? 560 : 340);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
