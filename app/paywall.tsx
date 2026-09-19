@@ -1,14 +1,21 @@
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Button, Text } from '@/components/ui';
-import { t } from '@/i18n';
-import { PRIVACY_POLICY_URL, TERMS_URL } from '@/monetization/config';
-import { usePremiumStore } from '@/store/usePremiumStore';
-import { useTheme } from '@/theme';
-import { useTabletColumn } from '../src/theme/useTabletColumn';
+import { Button, Text } from "@/components/ui";
+import { t } from "@/i18n";
+import { PRIVACY_POLICY_URL, TERMS_URL } from "@/monetization/config";
+import { usePremiumStore } from "@/store/usePremiumStore";
+import { useTheme } from "@/theme";
+import { useTabletColumn } from "../src/theme/useTabletColumn";
 
 /**
  * The one purchase this app sells: a lifetime non-consumable that removes the ads and unlocks
@@ -16,11 +23,18 @@ import { useTabletColumn } from '../src/theme/useTabletColumn';
  * and the portfolio does not sell those.
  */
 const BENEFIT_KEYS = [
-  { title: 'feat1Title', desc: 'feat1Desc' },
-  { title: 'feat2Title', desc: 'feat2Desc' },
-  { title: 'feat3Title', desc: 'feat3Desc' },
-  { title: 'feat4Title', desc: 'feat4Desc' },
+  { title: "feat1Title", desc: "feat1Desc" },
+  { title: "feat2Title", desc: "feat2Desc" },
+  { title: "feat3Title", desc: "feat3Desc" },
+  { title: "feat4Title", desc: "feat4Desc" },
 ] as const;
+
+/** Decorative section-mark used as the marginalia tag. Not a Latin letter, so it
+ *  carries no language content of its own — `check-ui-rules` exempts anything
+ *  that doesn't open with A-Za-z for exactly that reason — and it is hidden
+ *  from the accessibility tree below so a screen reader isn't made to read
+ *  "section sign" before every annotation. */
+const MARGIN_MARK = "§";
 
 export default function Paywall() {
   /**
@@ -40,7 +54,7 @@ export default function Paywall() {
   const router = useRouter();
   const tabletColumn = useTabletColumn(640);
   const insets = useSafeAreaInsets();
-  const { colors, spacing, radius } = useTheme();
+  const { colors, spacing } = useTheme();
 
   const lifetime = usePremiumStore((s) => s.lifetime);
   const offeringsResolved = usePremiumStore((s) => s.offeringsResolved);
@@ -69,75 +83,117 @@ export default function Paywall() {
   const price = lifetime?.product.priceString;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
-      <View style={{ alignItems: 'flex-end', padding: spacing.base }}>
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: colors.background,
+        paddingTop: insets.top,
+      }}
+    >
+      <View style={{ alignItems: "flex-end", padding: spacing.base }}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t('close')}
+          accessibilityLabel={t("close")}
           hitSlop={12}
           onPress={() => router.back()}
-          style={{ minWidth: 44, minHeight: 44, alignItems: 'flex-end', justifyContent: 'center' }}
+          style={{
+            minWidth: 44,
+            minHeight: 44,
+            alignItems: "flex-end",
+            justifyContent: "center",
+          }}
         >
           <Text variant="body" tone="muted">
-            {t('close')}
+            {t("close")}
           </Text>
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: spacing['3xl'], ...tabletColumn, flexGrow: 1, justifyContent: 'center' }}>
-        {/* Numbered, not ticked, and the promise leads.
- 
+      <ScrollView
+        contentContainerStyle={{
+          padding: spacing.xl,
+          paddingBottom: spacing["3xl"],
+          ...tabletColumn,
+          flexGrow: 1,
+          justifyContent: "center",
+        }}
+      >
+        {/* Annotated marginalia, not a list.
+
             29 of 44 apps in this portfolio shipped one paywall file byte for
             byte, and Apple rejected under 4.3(a) naming "multiple similar apps
-            using a repackaged app template". foldup, knotter and poursort are
-            the sharpest case: all three are rejected, and all three also shared
-            a home-screen structure that measured 1.00 identical.
- 
-            So this one leads with the no-subscription promise as the headline
-            rather than burying it in a card, and numbers what you get instead
-            of ticking it. Same claims, different page. */}
-        <Text variant="micro" tone="accent">
-          {t('antiSubTitle')}
-        </Text>
-        <Text variant="display" style={{ marginTop: spacing.xs }}>
-          {t('paywallTitle')}
-        </Text>
-        <Text variant="body" tone="muted" style={{ marginTop: spacing.sm }}>
-          {t('antiSubHeadline')}
-        </Text>
+            using a repackaged app template". A numbered-list paywall is still
+            a list shape shared with dozens of siblings even once the copy
+            differs, so this one is built like a page of annotated prose
+            instead: one narrative column, marked the way a manuscript marks
+            its own commentary, with what you get written as marginal notes
+            hung off the side of it rather than rows inside it. Same claims,
+            a structurally different page. */}
+        <View
+          style={{
+            borderLeftWidth: 3,
+            borderLeftColor: colors.accent,
+            paddingLeft: spacing.lg,
+          }}
+        >
+          <Text variant="title">{t("paywallTitle")}</Text>
+          <Text variant="body" tone="muted" style={{ marginTop: spacing.sm }}>
+            <Text variant="bodyStrong" tone="accent">
+              {t("antiSubTitle")}.{" "}
+            </Text>
+            {t("antiSubHeadline")}
+          </Text>
+        </View>
 
-        <View style={{ marginTop: spacing['2xl'], gap: spacing.xl }}>
-          {benefits.map((benefit, index) => (
-            <View key={benefit.title} style={{ flexDirection: 'row', gap: spacing.base }}>
-              <View
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 14,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
+        {/* Marginalia: each benefit is a side-note hung off the narrative
+            column, indented past it and marked rather than numbered or
+            iconed. However many benefits have a non-blank title, they stack
+            the same way. */}
+        <View style={{ marginTop: spacing["2xl"] }}>
+          {benefits.map((benefit) => (
+            <View
+              key={benefit.title}
+              style={{
+                marginTop: spacing.lg,
+                marginLeft: spacing["2xl"],
+                paddingLeft: spacing.base,
+                borderLeftWidth: StyleSheet.hairlineWidth * 2,
+                borderLeftColor: colors.border,
+              }}
+            >
+              <Text
+                variant="micro"
+                tone="accent"
+                accessibilityElementsHidden
+                importantForAccessibility="no"
               >
-                <Text variant="micro" tone="accent">
-                  {index + 1}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text variant="bodyStrong">{t(benefit.title)}</Text>
-                <Text variant="caption" tone="muted" style={{ marginTop: 2 }}>
-                  {t(benefit.desc)}
-                </Text>
-              </View>
+                {MARGIN_MARK}
+              </Text>
+              <Text variant="callout" style={{ marginTop: spacing.xs }}>
+                {t(benefit.title)}
+              </Text>
+              <Text variant="caption" tone="muted" style={{ marginTop: 2 }}>
+                {t(benefit.desc)}
+              </Text>
             </View>
           ))}
         </View>
 
-        <View style={{ marginTop: spacing['2xl'] }}>
+        <View
+          style={{
+            marginTop: spacing["3xl"],
+            paddingTop: spacing.xl,
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderTopColor: colors.border,
+          }}
+        >
           {lifetime ? (
             <Button
-              label={price ? t('lifetimeAccess', { price }) : t('lifetimeAccessPlain')}
+              label={
+                price
+                  ? t("lifetimeAccess", { price })
+                  : t("lifetimeAccessPlain")
+              }
               size="lg"
               fullWidth
               loading={isPurchasing}
@@ -147,26 +203,40 @@ export default function Paywall() {
             // Resolved, with no package: the store is genuinely unreachable or carries no
             // product yet. Say that, and keep Restore reachable below — a user who already
             // paid must still be able to get their purchase back.
-            <View style={{ padding: spacing.xl, alignItems: 'center' }}>
+            <View style={{ padding: spacing.xl, alignItems: "center" }}>
               <Text variant="caption" tone="muted" align="center">
-                {t('storeUnavailable')}
+                {t("storeUnavailable")}
               </Text>
             </View>
           ) : (
-            <View style={{ padding: spacing.xl, alignItems: 'center' }}>
+            <View style={{ padding: spacing.xl, alignItems: "center" }}>
               <ActivityIndicator color={colors.textMuted} />
-              <Text variant="caption" tone="muted" style={{ marginTop: spacing.md }}>
-                {t('loadingPrice')}
+              <Text
+                variant="caption"
+                tone="muted"
+                style={{ marginTop: spacing.md }}
+              >
+                {t("loadingPrice")}
               </Text>
             </View>
           )}
-          <Text variant="caption" tone="muted" align="center" style={{ marginTop: spacing.md }}>
-            {t('oneTimePayment')}
+          <Text
+            variant="caption"
+            tone="muted"
+            align="center"
+            style={{ marginTop: spacing.md }}
+          >
+            {t("oneTimePayment")}
           </Text>
         </View>
 
         {error ? (
-          <Text variant="caption" tone="danger" align="center" style={{ marginTop: spacing.base }}>
+          <Text
+            variant="caption"
+            tone="danger"
+            align="center"
+            style={{ marginTop: spacing.base }}
+          >
             {error}
           </Text>
         ) : null}
@@ -184,47 +254,52 @@ export default function Paywall() {
         ) : null}
 
         <Button
-          label={t('restorePurchases')}
+          label={t("restorePurchases")}
           variant="ghost"
           fullWidth
           onPress={() => {
             setRestoreNotice(null);
             void restore().then((outcome) => {
-              if (outcome === 'none') setRestoreNotice(t('noPriorPurchases'));
+              if (outcome === "none") setRestoreNotice(t("noPriorPurchases"));
             });
           }}
           style={{ marginTop: spacing.lg }}
         />
 
-        <Text variant="micro" tone="faint" align="center" style={{ marginTop: spacing.xl }}>
-          {t('adsDisclosure')}
+        <Text
+          variant="micro"
+          tone="faint"
+          align="center"
+          style={{ marginTop: spacing.xl }}
+        >
+          {t("adsDisclosure")}
         </Text>
         <View
           style={{
-            flexDirection: 'row',
-            justifyContent: 'center',
+            flexDirection: "row",
+            justifyContent: "center",
             gap: spacing.lg,
             marginTop: spacing.md,
           }}
         >
           <Pressable
             accessibilityRole="link"
-            accessibilityLabel={t('termsOfUse')}
+            accessibilityLabel={t("termsOfUse")}
             hitSlop={12}
             onPress={() => void Linking.openURL(TERMS_URL)}
           >
             <Text variant="micro" tone="faint">
-              {t('termsOfUse')}
+              {t("termsOfUse")}
             </Text>
           </Pressable>
           <Pressable
             accessibilityRole="link"
-            accessibilityLabel={t('privacyPolicy')}
+            accessibilityLabel={t("privacyPolicy")}
             hitSlop={12}
             onPress={() => void Linking.openURL(PRIVACY_POLICY_URL)}
           >
             <Text variant="micro" tone="faint">
-              {t('privacyPolicy')}
+              {t("privacyPolicy")}
             </Text>
           </Pressable>
         </View>
