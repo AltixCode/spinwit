@@ -1,0 +1,35 @@
+{
+  "identifier": "52EFB96D-3726-4D75-BA4A-09DA735BC2A5",
+  "nonRenewingSubscriptions": [],
+  "products": [
+    {
+      "displayPrice": "4.99",
+      "familyShareable": false,
+      "internalID": "EEE581DD-15BE-4316-B57C-534B0657D15D",
+      "localizations": [
+        {
+          "description": "spinwit remove ads lifetime unlock",
+          "displayName": "spinwit remove ads",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.altixcode.spinwit.removeads",
+      "referenceName": "spinwit remove ads",
+      "type": "NonConsumable"
+    }
+  ],
+  "settings": {
+    "_applicationInternalID": "",
+    "_developerTeamID": "",
+    "_failTransactionsEnabled": false,
+    "_lastSynchronizedDate": 0,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": []
+  },
+  "subscriptionGroups": [],
+  "version": {
+    "major": 4,
+    "minor": 0
+  }
+}
