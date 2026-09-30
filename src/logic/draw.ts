@@ -31,7 +31,10 @@ export function drawIndex(count: number, rng: Rng = Math.random): number {
  * A weighted winner. Weights are the paid variant of the same draw — they change the odds
  * deliberately, and the UI says so rather than quietly biasing an apparently fair wheel.
  */
-export function weightedIndex(weights: readonly number[], rng: Rng = Math.random): number {
+export function weightedIndex(
+  weights: readonly number[],
+  rng: Rng = Math.random,
+): number {
   if (weights.length === 0) return -1;
   const safe = weights.map((w) => (Number.isFinite(w) && w > 0 ? w : 0));
   const total = safe.reduce((a, b) => a + b, 0);
@@ -51,12 +54,42 @@ export function weightedIndex(weights: readonly number[], rng: Rng = Math.random
  * The absolute rotation, in degrees, that brings `index`'s segment under the pointer at the
  * top, after at least `turns` whole revolutions so the spin reads as a spin.
  */
-export function landingAngle(index: number, count: number, turns: number): number {
+export function landingAngle(
+  index: number,
+  count: number,
+  turns: number,
+): number {
   if (index < 0 || count < 1) return 0;
   const segment = 360 / count;
   // Rotate so the *centre* of the segment, not its edge, arrives under the pointer.
   const offset = 360 - index * segment - segment / 2;
   return turns * 360 + offset;
+}
+
+/**
+ * The wheel's next absolute rotation, given where it is now.
+ *
+ * `landingAngle` is absolute -- it assumes the wheel starts at 0deg -- but the wheel does not
+ * reset between spins, it keeps whatever angle the last spin left it at. Simply adding a new
+ * `landingAngle` onto that leftover angle stacks a second, unrelated offset on top of the
+ * first: after spin one the wheel sits at some `offset1 mod 360`, and spin two's `previous +
+ * landingAngle(...)` lands at `(offset1 + offset2) mod 360`, not `offset2` -- the wheel
+ * visually stops on a different segment than the one `index` (and the winner label) names.
+ * This is exactly what testers reported as "the winner label and the actual box shown as the
+ * winner is different."
+ *
+ * The fix: strip the previous spin's leftover offset before adding the new one, keeping only
+ * its whole-revolution count -- so every spin's own `landingAngle` offset is the only one that
+ * determines where the wheel actually rests.
+ */
+export function nextAngle(
+  previous: number,
+  index: number,
+  count: number,
+  turns: number,
+): number {
+  const base = Math.floor(previous / 360) * 360;
+  return base + landingAngle(index, count, turns);
 }
 
 /**
@@ -70,7 +103,7 @@ export function normaliseEntries(entries: readonly string[]): string[] {
   const out: string[] = [];
   for (const raw of entries) {
     const entry = raw.trim();
-    if (entry === '') continue;
+    if (entry === "") continue;
     const key = entry.toLocaleLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -86,18 +119,32 @@ export function nextWheelState(
   winner: number,
   removeOnWin: boolean,
 ): string[] {
-  if (!removeOnWin || winner < 0 || winner >= entries.length) return [...entries];
+  if (!removeOnWin || winner < 0 || winner >= entries.length)
+    return [...entries];
   return entries.filter((_, i) => i !== winner);
 }
 
-export type CoinFace = 'heads' | 'tails';
+export type CoinFace = "heads" | "tails";
 
 export function tossCoin(rng: Rng = Math.random): CoinFace {
-  return unit(rng) < 0.5 ? 'heads' : 'tails';
+  return unit(rng) < 0.5 ? "heads" : "tails";
 }
 
 /** `count` dice of `sides` each. Empty for a die that cannot exist. */
-export function rollDice(count: number, sides: number, rng: Rng = Math.random): number[] {
-  if (!Number.isFinite(count) || !Number.isFinite(sides) || count < 1 || sides < 2) return [];
-  return Array.from({ length: Math.floor(count) }, () => Math.floor(unit(rng) * Math.floor(sides)) + 1);
+export function rollDice(
+  count: number,
+  sides: number,
+  rng: Rng = Math.random,
+): number[] {
+  if (
+    !Number.isFinite(count) ||
+    !Number.isFinite(sides) ||
+    count < 1 ||
+    sides < 2
+  )
+    return [];
+  return Array.from(
+    { length: Math.floor(count) },
+    () => Math.floor(unit(rng) * Math.floor(sides)) + 1,
+  );
 }

@@ -1,22 +1,39 @@
-import Feather from '@expo/vector-icons/Feather';
-import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Feather from "@expo/vector-icons/Feather";
+import * as Haptics from "expo-haptics";
+import { useRouter } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { BannerAdSlot } from '@/components/BannerAdSlot';
-import { Wheel } from '@/components/Wheel';
-import { Button, Card, Text } from '@/components/ui';
-import { t } from '@/i18n';
-import { drawIndex, landingAngle, rollDice, tossCoin, weightedIndex } from '@/logic/draw';
-import { shouldShowInterstitial } from '@/monetization/adPolicy';
-import { shouldShowAds } from '@/monetization/entitlements';
-import { showInterstitial } from '@/monetization/interstitial';
-import { FREE_WHEELS, useWheelStore, type Mode } from '@/store/useWheelStore';
-import { usePremiumStore } from '@/store/usePremiumStore';
-import { MIN_TOUCH_TARGET, useTheme, withAlpha } from '@/theme';
-import { useTabletColumn } from '@/theme/useTabletColumn';
+import { BannerAdSlot } from "@/components/BannerAdSlot";
+import { CoinFace } from "@/components/CoinFace";
+import { DiceRoll } from "@/components/DiceRoll";
+import { Wheel } from "@/components/Wheel";
+import { Button, Card, Text } from "@/components/ui";
+import { useSoundEffects } from "@/hooks/useSoundEffects";
+import { t } from "@/i18n";
+import {
+  drawIndex,
+  nextAngle,
+  rollDice,
+  tossCoin,
+  weightedIndex,
+} from "@/logic/draw";
+import { shouldShowInterstitial } from "@/monetization/adPolicy";
+import { shouldShowAds } from "@/monetization/entitlements";
+import { showInterstitial } from "@/monetization/interstitial";
+import { FREE_WHEELS, useWheelStore, type Mode } from "@/store/useWheelStore";
+import { usePremiumStore } from "@/store/usePremiumStore";
+import { MIN_TOUCH_TARGET, useTheme, withAlpha } from "@/theme";
+import { useTabletColumn } from "@/theme/useTabletColumn";
 
 /** Whole turns before the wheel settles. Enough to read as a spin, not enough to be a wait. */
 const TURNS = 5;
@@ -53,17 +70,20 @@ export default function Home() {
   const entries = useWheelStore((s) => s.entries)();
   const activeWheel = useWheelStore((s) => s.activeWheel)();
 
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState("");
   const [rejected, setRejected] = useState(false);
   const [angle, setAngle] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const [winner, setWinner] = useState<string | null>(null);
-  const [coin, setCoin] = useState<'heads' | 'tails' | null>(null);
+  const [coin, setCoin] = useState<"heads" | "tails" | null>(null);
   const [dice, setDice] = useState<number[]>([]);
+  const [tossToken, setTossToken] = useState(0);
+  const [rollToken, setRollToken] = useState(0);
 
   const pendingWinner = useRef<number>(-1);
   const spins = useRef(0);
   const lastInterstitialAt = useRef(0);
+  const playSound = useSoundEffects();
 
   useEffect(() => {
     void hydrate();
@@ -82,15 +102,17 @@ export default function Home() {
     // The winner is drawn FIRST. The wheel is then animated to it. Spinning by a random angle
     // and reading off whatever stops under the pointer is biased by the segment geometry, and
     // the bias is invisible — the animation looks identical.
-    const index = activeWheel && isPremium
-      ? weightedIndex(activeWheel.weights)
-      : drawIndex(entries.length);
+    const index =
+      activeWheel && isPremium
+        ? weightedIndex(activeWheel.weights)
+        : drawIndex(entries.length);
     if (index < 0) return;
     pendingWinner.current = index;
     setWinner(null);
     setSpinning(true);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setAngle((previous) => previous + landingAngle(index, entries.length, TURNS));
+    playSound("tap");
+    setAngle((previous) => nextAngle(previous, index, entries.length, TURNS));
   };
 
   const settled = useCallback(() => {
@@ -100,10 +122,11 @@ export default function Home() {
     if (name === undefined) return;
     setWinner(name);
     recordSpin(name);
+    playSound("success");
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     if (removeOnWin) applyRemoval(index);
     spins.current += 1;
-  }, [entries, recordSpin, removeOnWin, applyRemoval]);
+  }, [entries, recordSpin, removeOnWin, applyRemoval, playSound]);
 
   /**
    * The interstitial runs when the user moves to a different tool, never between a spin and
@@ -112,56 +135,63 @@ export default function Home() {
   // useCallback rather than a bare arrow: the React Compiler analyses an inline handler
   // created inside a .map() as render code, and rejects the Date.now() in it as an impure
   // call during render. Declaring it as a stable event handler is both the fix and the truth.
-  const switchMode = useCallback((next: Mode) => {
-    if (next === mode || spinning) return;
-    if (
-      shouldShowAds({ isPremium, isReady }) &&
-      shouldShowInterstitial({
-        gamesPlayed: spins.current,
-        lastInterstitialAt: lastInterstitialAt.current,
-        now: Date.now(),
-        adsRemoved: isPremium,
-      }) &&
-      showInterstitial()
-    ) {
-      lastInterstitialAt.current = Date.now();
-    }
-    setWinner(null);
-    setCoin(null);
-    setDice([]);
-    setMode(next);
-  }, [mode, spinning, isPremium, isReady, setMode]);
+  const switchMode = useCallback(
+    (next: Mode) => {
+      if (next === mode || spinning) return;
+      if (
+        shouldShowAds({ isPremium, isReady }) &&
+        shouldShowInterstitial({
+          gamesPlayed: spins.current,
+          lastInterstitialAt: lastInterstitialAt.current,
+          now: Date.now(),
+          adsRemoved: isPremium,
+        }) &&
+        showInterstitial()
+      ) {
+        lastInterstitialAt.current = Date.now();
+      }
+      setWinner(null);
+      setCoin(null);
+      setDice([]);
+      setMode(next);
+    },
+    [mode, spinning, isPremium, isReady, setMode],
+  );
 
   const submitEntry = () => {
-    if (draft.trim() === '') return;
+    if (draft.trim() === "") return;
     if (!addEntry(draft)) {
       setRejected(true);
       return;
     }
-    setDraft('');
+    setDraft("");
   };
 
   const save = () => {
-    const outcome = saveWheel(draft.trim() || t('savedWheels'), isPremium);
-    if (outcome === 'limit-reached') {
+    const outcome = saveWheel(draft.trim() || t("savedWheels"), isPremium);
+    if (outcome === "limit-reached") {
       if (wheels.length >= FREE_WHEELS && !isPremium) {
-        Alert.alert(t('wheelLimitTitle'), t('wheelLimitBody'), [
-          { text: t('cancel'), style: 'cancel' },
-          { text: t('removeAdsCta'), onPress: () => router.push('/paywall') },
+        Alert.alert(t("wheelLimitTitle"), t("wheelLimitBody"), [
+          { text: t("cancel"), style: "cancel" },
+          { text: t("removeAdsCta"), onPress: () => router.push("/paywall") },
         ]);
       } else {
         setRejected(true);
       }
       return;
     }
-    setDraft('');
+    setDraft("");
   };
 
   // The wheel is the app. At a flat 340 it was a phone-sized dial adrift in a
   // 13" display; the height term matters more here than elsewhere because the
   // wheel shares the screen with the entries list below it.
   const isTablet = width >= 700;
-  const wheelSize = Math.min(width - spacing.base * 2, height * 0.45, isTablet ? 560 : 340);
+  const wheelSize = Math.min(
+    width - spacing.base * 2,
+    height * 0.45,
+    isTablet ? 560 : 340,
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -173,19 +203,19 @@ export default function Home() {
           paddingHorizontal: spacing.base,
           paddingBottom: spacing.xl,
           gap: spacing.base,
-        
+
           ...tabletColumn,
         }}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.titleRow}>
           <Text variant="title" style={styles.grow}>
-            {t('appName')}
+            {t("appName")}
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={t('settingsTitle')}
-            onPress={() => router.push('/settings')}
+            accessibilityLabel={t("settingsTitle")}
+            onPress={() => router.push("/settings")}
             hitSlop={8}
             style={styles.iconSlot}
           >
@@ -194,9 +224,14 @@ export default function Home() {
         </View>
 
         <View style={[styles.chips, { gap: spacing.sm }]}>
-          {(['wheel', 'coin', 'dice'] as const).map((m) => {
+          {(["wheel", "coin", "dice"] as const).map((m) => {
             const selected = m === mode;
-            const label = m === 'wheel' ? t('modeWheel') : m === 'coin' ? t('modeCoin') : t('modeDice');
+            const label =
+              m === "wheel"
+                ? t("modeWheel")
+                : m === "coin"
+                  ? t("modeCoin")
+                  : t("modeDice");
             return (
               <Pressable
                 key={m}
@@ -207,13 +242,16 @@ export default function Home() {
                 android_ripple={{ color: withAlpha(colors.accent, 0.16) }}
                 style={{
                   minHeight: MIN_TOUCH_TARGET,
-                  justifyContent: 'center',
+                  justifyContent: "center",
                   paddingHorizontal: spacing.base,
                   borderRadius: radius.full,
                   backgroundColor: selected ? colors.accent : colors.surfaceAlt,
                 }}
               >
-                <Text variant="callout" color={selected ? colors.onAccent : colors.text}>
+                <Text
+                  variant="callout"
+                  color={selected ? colors.onAccent : colors.text}
+                >
                   {label}
                 </Text>
               </Pressable>
@@ -221,14 +259,25 @@ export default function Home() {
           })}
         </View>
 
-        {mode === 'wheel' ? (
+        {mode === "wheel" ? (
           <>
             <View style={styles.centre}>
               {entries.length >= 2 ? (
-                <Wheel entries={entries} angle={angle} spinning={spinning} onSettled={settled} size={wheelSize} />
+                <Wheel
+                  entries={entries}
+                  angle={angle}
+                  spinning={spinning}
+                  onSettled={settled}
+                  size={wheelSize}
+                />
               ) : (
-                <Text variant="body" tone="muted" align="center" style={{ paddingVertical: spacing['3xl'] }}>
-                  {t('needTwoEntries')}
+                <Text
+                  variant="body"
+                  tone="muted"
+                  align="center"
+                  style={{ paddingVertical: spacing["3xl"] }}
+                >
+                  {t("needTwoEntries")}
                 </Text>
               )}
             </View>
@@ -236,7 +285,7 @@ export default function Home() {
             {winner ? (
               <Card>
                 <Text variant="micro" tone="faint">
-                  {t('winnerIs').toUpperCase()}
+                  {t("winnerIs").toUpperCase()}
                 </Text>
                 <Text variant="title" style={{ marginTop: spacing.xs }}>
                   {winner}
@@ -244,7 +293,13 @@ export default function Home() {
               </Card>
             ) : null}
 
-            <Button label={t('spinButton')} size="lg" fullWidth disabled={!canSpin} onPress={spin} />
+            <Button
+              label={t("spinButton")}
+              size="lg"
+              fullWidth
+              disabled={!canSpin}
+              onPress={spin}
+            />
 
             {/* The field and the Add button beside it carry DIFFERENT labels on purpose: two
                 controls announced identically are ambiguous to a screen reader. */}
@@ -253,22 +308,32 @@ export default function Home() {
                 value={draft}
                 onChangeText={setDraft}
                 onSubmitEditing={submitEntry}
-                placeholder={t('entryPlaceholder')}
+                placeholder={t("entryPlaceholder")}
                 placeholderTextColor={colors.textFaint}
-                accessibilityLabel={t('entryPlaceholder')}
+                accessibilityLabel={t("entryPlaceholder")}
                 returnKeyType="done"
                 style={[
                   styles.input,
                   styles.grow,
-                  { color: colors.text, backgroundColor: colors.surfaceAlt, borderRadius: radius.md, paddingHorizontal: spacing.md },
+                  {
+                    color: colors.text,
+                    backgroundColor: colors.surfaceAlt,
+                    borderRadius: radius.md,
+                    paddingHorizontal: spacing.md,
+                  },
                 ]}
               />
-              <Button label={t('addEntryLabel')} size="sm" disabled={draft.trim() === ''} onPress={submitEntry} />
+              <Button
+                label={t("addEntryLabel")}
+                size="sm"
+                disabled={draft.trim() === ""}
+                onPress={submitEntry}
+              />
             </View>
 
             {rejected ? (
               <Text variant="caption" tone="danger">
-                {t('entryRejected')}
+                {t("entryRejected")}
               </Text>
             ) : null}
 
@@ -278,7 +343,12 @@ export default function Home() {
                   key={`${entry}-${index}`}
                   style={[
                     styles.entryRow,
-                    { minHeight: MIN_TOUCH_TARGET, paddingHorizontal: spacing.base, borderRadius: radius.md, backgroundColor: colors.surface },
+                    {
+                      minHeight: MIN_TOUCH_TARGET,
+                      paddingHorizontal: spacing.base,
+                      borderRadius: radius.md,
+                      backgroundColor: colors.surface,
+                    },
                   ]}
                 >
                   <Text variant="callout" style={styles.grow} numberOfLines={1}>
@@ -286,7 +356,7 @@ export default function Home() {
                   </Text>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`${t('deleteWheel')}: ${entry}`}
+                    accessibilityLabel={`${t("deleteWheel")}: ${entry}`}
                     onPress={() => removeEntry(index)}
                     hitSlop={10}
                     style={styles.iconSlot}
@@ -300,29 +370,50 @@ export default function Home() {
             <Pressable
               accessibilityRole="switch"
               accessibilityState={{ checked: removeOnWin }}
-              accessibilityLabel={t('removeOnWinLabel')}
+              accessibilityLabel={t("removeOnWinLabel")}
               onPress={toggleRemoveOnWin}
-              style={[styles.row, { minHeight: MIN_TOUCH_TARGET, gap: spacing.md }]}
+              style={[
+                styles.row,
+                { minHeight: MIN_TOUCH_TARGET, gap: spacing.md },
+              ]}
             >
-              <Feather name={removeOnWin ? 'check-square' : 'square'} size={20} color={removeOnWin ? colors.accent : colors.textFaint} />
+              <Feather
+                name={removeOnWin ? "check-square" : "square"}
+                size={20}
+                color={removeOnWin ? colors.accent : colors.textFaint}
+              />
               <Text variant="callout" style={styles.grow}>
-                {t('removeOnWinLabel')}
+                {t("removeOnWinLabel")}
               </Text>
             </Pressable>
 
-            <Button label={t('saveWheelLabel')} icon="bookmark" variant="secondary" size="sm" onPress={save} />
+            <Button
+              label={t("saveWheelLabel")}
+              icon="bookmark"
+              variant="secondary"
+              size="sm"
+              onPress={save}
+            />
 
             {wheels.length > 0 ? (
               <View style={{ gap: spacing.sm }}>
                 <Text variant="micro" tone="faint">
-                  {t('savedWheels').toUpperCase()}
+                  {t("savedWheels").toUpperCase()}
                 </Text>
                 {wheels.map((w) => (
                   <View
                     key={w.id}
                     style={[
                       styles.entryRow,
-                      { minHeight: MIN_TOUCH_TARGET, paddingHorizontal: spacing.base, borderRadius: radius.md, backgroundColor: w.id === activeId ? withAlpha(colors.accent, 0.16) : colors.surface },
+                      {
+                        minHeight: MIN_TOUCH_TARGET,
+                        paddingHorizontal: spacing.base,
+                        borderRadius: radius.md,
+                        backgroundColor:
+                          w.id === activeId
+                            ? withAlpha(colors.accent, 0.16)
+                            : colors.surface,
+                      },
                     ]}
                   >
                     <Pressable
@@ -338,12 +429,16 @@ export default function Home() {
                     </Pressable>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={`${t('deleteWheel')}: ${w.name}`}
+                      accessibilityLabel={`${t("deleteWheel")}: ${w.name}`}
                       onPress={() => deleteWheel(w.id)}
                       hitSlop={10}
                       style={styles.iconSlot}
                     >
-                      <Feather name="trash-2" size={16} color={colors.textFaint} />
+                      <Feather
+                        name="trash-2"
+                        size={16}
+                        color={colors.textFaint}
+                      />
                     </Pressable>
                   </View>
                 ))}
@@ -351,46 +446,64 @@ export default function Home() {
             ) : null}
 
             <Text variant="caption" tone="faint">
-              {t('fairnessNote')}
+              {t("fairnessNote")}
             </Text>
           </>
         ) : null}
 
-        {mode === 'coin' ? (
-          <View style={{ gap: spacing.base, alignItems: 'center' }}>
-            <Text variant="display" style={{ paddingVertical: spacing['2xl'] }}>
-              {coin === null ? '—' : coin === 'heads' ? t('headsLabel') : t('tailsLabel')}
-            </Text>
+        {mode === "coin" ? (
+          <View style={{ gap: spacing.base, alignItems: "center" }}>
+            <View style={{ paddingVertical: spacing["2xl"] }}>
+              <CoinFace
+                tossToken={tossToken}
+                label={
+                  coin === null
+                    ? null
+                    : coin === "heads"
+                      ? t("headsLabel")
+                      : t("tailsLabel")
+                }
+              />
+            </View>
             <Button
-              label={t('tossButton')}
+              label={t("tossButton")}
               size="lg"
               fullWidth
               onPress={() => {
                 void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                playSound("tap");
                 setCoin(tossCoin());
+                setTossToken((n) => n + 1);
+                playSound("success");
                 spins.current += 1;
               }}
             />
           </View>
         ) : null}
 
-        {mode === 'dice' ? (
+        {mode === "dice" ? (
           <View style={{ gap: spacing.base }}>
-            <Text variant="display" align="center" style={{ paddingVertical: spacing.xl }}>
-              {dice.length === 0 ? '—' : dice.join('  ')}
-            </Text>
+            <View style={{ paddingVertical: spacing.xl }}>
+              <DiceRoll
+                rollToken={rollToken}
+                label={dice.length === 0 ? "—" : dice.join("  ")}
+              />
+            </View>
             {dice.length > 0 ? (
               <Text variant="caption" tone="muted" align="center">
-                {t('diceTotal', { total: dice.reduce((a, b) => a + b, 0) })}
+                {t("diceTotal", { total: dice.reduce((a, b) => a + b, 0) })}
               </Text>
             ) : null}
             <Button
-              label={t('rollButton')}
+              label={t("rollButton")}
               size="lg"
               fullWidth
               onPress={() => {
                 void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                playSound("tap");
                 setDice(rollDice(diceCount, diceSides));
+                setRollToken((n) => n + 1);
+                playSound("success");
                 spins.current += 1;
               }}
             />
@@ -401,16 +514,26 @@ export default function Home() {
           <View style={{ gap: spacing.sm, marginTop: spacing.md }}>
             <View style={styles.row}>
               <Text variant="micro" tone="faint" style={styles.grow}>
-                {t('historyTitle').toUpperCase()}
+                {t("historyTitle").toUpperCase()}
               </Text>
-              <Pressable accessibilityRole="button" accessibilityLabel={t('clearHistory')} onPress={clearHistory} hitSlop={8}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("clearHistory")}
+                onPress={clearHistory}
+                hitSlop={8}
+              >
                 <Text variant="caption" tone="accent">
-                  {t('clearHistory')}
+                  {t("clearHistory")}
                 </Text>
               </Pressable>
             </View>
             {history.slice(0, 8).map((record) => (
-              <Text key={record.id} variant="caption" tone="muted" numberOfLines={1}>
+              <Text
+                key={record.id}
+                variant="caption"
+                tone="muted"
+                numberOfLines={1}
+              >
                 {record.winner}
               </Text>
             ))}
@@ -423,12 +546,17 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
-  titleRow: { flexDirection: 'row', alignItems: 'center' },
-  row: { flexDirection: 'row', alignItems: 'center' },
-  chips: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
-  centre: { alignItems: 'center', justifyContent: 'center' },
-  entryRow: { flexDirection: 'row', alignItems: 'center' },
+  titleRow: { flexDirection: "row", alignItems: "center" },
+  row: { flexDirection: "row", alignItems: "center" },
+  chips: { flexDirection: "row", alignItems: "center", flexWrap: "wrap" },
+  centre: { alignItems: "center", justifyContent: "center" },
+  entryRow: { flexDirection: "row", alignItems: "center" },
   grow: { flex: 1 },
   input: { minHeight: MIN_TOUCH_TARGET, fontSize: 16 },
-  iconSlot: { width: 36, height: MIN_TOUCH_TARGET, alignItems: 'center', justifyContent: 'center' },
+  iconSlot: {
+    width: 36,
+    height: MIN_TOUCH_TARGET,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

@@ -154,6 +154,18 @@ const config: ExpoConfig = {
     ],
     ['expo-tracking-transparency', { userTrackingPermission: TRACKING_USAGE }],
     [
+      'expo-audio',
+      {
+        // Playback-only sound effects -- no recording anywhere in this app, so
+        // none of expo-audio's mic permissions or background-audio entitlements
+        // apply. Declaring them anyway would be an unused permission a store
+        // review can flag and a real privacy question this app has no answer to.
+        microphonePermission: false,
+        recordAudioAndroid: false,
+        enableBackgroundPlayback: false,
+      },
+    ],
+    [
       'expo-build-properties',
       {
         ios: { deploymentTarget: '16.4' },

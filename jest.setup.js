@@ -17,6 +17,19 @@ process.env.EXPO_OS = process.env.EXPO_OS || 'ios';
 // animated components synchronously, which is what component tests need.
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
 
+// Playback-only sound effects. `createAudioPlayer` reaches for the native JSI binding at
+// import time, which does not exist under Jest -- a component test needs a player whose
+// play/pause/seekTo/remove calls it can assert on rather than the real native module.
+jest.mock('expo-audio', () => ({
+  createAudioPlayer: jest.fn(() => ({
+    play: jest.fn(),
+    pause: jest.fn(),
+    seekTo: jest.fn(),
+    remove: jest.fn(),
+  })),
+  setAudioModeAsync: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock('expo-haptics', () => ({
   impactAsync: jest.fn(),
   notificationAsync: jest.fn(),
